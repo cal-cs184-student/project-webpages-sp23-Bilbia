@@ -1,7 +1,289 @@
-<html>
-	<head>
-	</head>
-	<body>
-		Project 1 here
-	</body>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>Project 1: Rasterizer</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+
+<body>
+
+<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2023</h1>
+<h1 align="middle">Project 1: Rasterizer</h1>
+<h2 align="middle">Beatriz Muniz de Castro e Silva (biamcs@berkeley.edu)</h2>
+
+<br><br>
+
+<div>
+
+  <a href="../"><p align="middle">Back to Homepage</p></a>
+
+<h2 align="middle">Overview</h2>
+<p>
+  In this project I implemented a rasterizer for SVGs, with capabilities to draw simple triangles, supersampling for antialiasing, transforms, linear 
+  interpolations through barycentric coordinates, and texture mapping through pixel sampling. This project was done in a way that it constructs on itself,
+  not only allowing us to understand the basics such as a (not so) simple triangle rasterization, but also understand how different concepts, such as linear 
+  interpolations and texture mapping, relate to each other.
+</p>
+
+<p align="middle">
+  ============================================================================================
+</p>
+
+<h2 align="middle">Task 1: Drawing Single-Color Triangles</h2>
+
+<p>In the first part of the project, we had to modify the <code>rasterize_triangle</code> function in order to draw triangles on the screen based
+	on the coordinates of its vertices. Here's how I did it:
+  <ol>
+    <li>
+      Determine the extreme x and y values between the vertices. This is used to define the bounding box that we will run through when filling 
+	  the inside of the triangle.
+    </li>
+    <li>
+      Adding a 0.5 offset to the current tested pixel so we can compare pixels by its center.
+    </li>
+    <li>
+      For each vertice, check if it is to the left or the right of the line that connects the other two vertices with the function 
+	  <br> \(N(a) = (x_b - x_a)*(y_c - y_a) - (y_b - y_a)*(x_c - x_a)\). This will allow us to check whether the vertices were given in clockwise or 
+	  counter-clockwise order.
+    </li>
+	<li>
+		Run trough all the pixels in the bounding box. For each pixel, determine the values of  \(L_0, L_1\) and \(L_2\), which we get through 
+		the formulas \(L(x, y) = -(x - x_0)(y_1 - y_0) + (y - y_0)(x_1 - x_0)\). If the values of \(L_0, L_1\) and \(L_2\) are all bigger or equal
+		to 0, then the pixel is inside the triangle. The order of \(P_0\) and \(P_1\) matter as they form a vector between them, and the normal 
+		vector is utilized to determine whether a pixel is inside the triangle. 
+		The value of N calculated above is used to set the order of \(P_0\) and \(P_1\). 
+	</li>
+    <li>
+      If a point is determined to be inside the triangle, fill that pixel in the sample buffer with the given color.
+    </li>
+  </ol>
+  	After all pixels inside the bounding box have been iterated through and their colors have been defined in the sample buffer, the image is 
+	rasterized. Since this process does iterate over each pixel in the triangle's bounding box, this is the same as one that checks each sample 
+	within the bounding box of a triangle, and therefore it is no worse.
+  </p>
+
+  <div align="middle">
+    <table style="width=100%">
+      <tr>
+        <td>
+          <img src="img/task2-1.png" align="middle" width="500px"/>
+          <figcaption align="middle"> Rasterized triangles in <code>basic/test4.svg</code> with pixel inspector showing thin point of a triangle corner, which seems disconnected from the rest of the triangle</figcaption>
+        </td>
+      </tr>
+      <br>
+    </table>
+  </div>
+</p>
+
+<p align="middle">
+  ============================================================================================
+</p>
+
+<h2 align="middle">Task 2: Antialiasing by Supersampling</h2>
+<p>
+	Next in the project, we built on top of the <code>rasterize_triangle</code> function in order to implement supersampling. In supersampling,
+	we increase the sample rate, which means that instead of checking if the center of the pixel is inside the triangle once and apply the absolute
+	color to the whole pixel, we divide the pixel in \(n\) squares, \(n\) being equal to the sample rate, and test whether the center of these
+	smaller squares are inside the triangle. We then average the color of the pixel based on how many of the sub-samples are inside the pixel.
+	This leads to creating a gradient around the edges instead of the hard jaggies we found in Task 1, creating a smoother image. The higher the
+	sample rate, the smoother the image, since you are testing more points inside the pixel. 
+</p>
+
+<p>
+	In order to implement supersampling, a few changes had to be made:
+	<ol>
+		<li>
+			The size of the sample buffer had to be increased to match the increased amount of points being tested. This was achieved by 
+			multiplying the sample buffer size by the sample rate. However, we want our final image to be the same size as a not-supersampled
+			image, therefore we must downsize the buffer in the <code>resolve_to_framebuffer</code> function. More details on that below.
+		</li>
+		<li>
+			Adding two more inner loops to the part of the <code>rasterize_triangle</code> algorithm that runs through the pixels in the bounding 
+			box. This allows us to run through the sub-squares of each pixel. Since the pixels are being divided in \(n\) uniformely distributed 
+			squares, we must adjust the step of the function to increase by \(1 / \sqrt{\text{sampling_rate}}\). The resized sample buffer allows 
+			us to save the values for each sub-sample.
+		</li>
+		<li>
+			Modify the <code>resolve_to_framebuffer</code> function in order to downsize the buffer. This is where we average the pixel color 
+			based on the sample rate. We iterate over the sample buffer, adding up the values for each pixel's sub-samples, and average that
+			by the number of sub-samples. We then apply that recalculated color value to the whole pixel that is drawn on the screen.
+		</li>
+	</ol> 
+
+	The results of supersampling can be seen in the images below, where supersampling was applied to <code>basic/test4.svg</code> with different 
+	sample rates with the pixel inspector targeting the same area as illustrated in Task 1:
+</p>
+
+<div align="middle">
+	<table style="width=100%">
+	  <tr>
+		<td>
+		  <img src="img/task2-1.png" align="middle" width="500px"/>
+		  <figcaption align="middle">Supersampling with sample rate of 1 sample per pixel</figcaption>
+		</td>
+		<td>
+		  <img src="img/task2-4.png" align="middle" width="500px"/>
+		  <figcaption align="middle">Supersampling with sample rate of 4 samples per pixel</figcaption>
+		</td>
+	  </tr>
+	  <br>
+	  <tr>
+		<td>
+		  <img src="img/task2-9.png" align="middle" width="500px"/>
+		  <figcaption align="middle">Supersampling with sample rate of 9 samples per pixel</figcaption>
+		</td>
+		<td>
+		  <img src="img/task2-16.png" align="middle" width="500px"/>
+		  <figcaption align="middle">Supersampling with sample rate of 16 samples per pixel</figcaption>
+		</td>
+	  </tr>
+	</table>
+  </div>
+<p>
+	In the images above, we can clearly see that the image looks smoother as we increase the sample rate. Since more points inside the pixel are 
+	being tested, instead of just the center, more pixels that are only partially inside the triangle are being represented, which also leads to 
+	pixels that looked disconnected in the not-supersampled image connect to the rest of the triangle. By averaging the color, we make sure that
+	the lines look softer than it would be if we only applied the absolute color value to the edge pixels.
+
+</p>
+
+<p align="middle">
+  ============================================================================================
+</p>
+
+<h2 align="middle">Task 3: Transforms</h2>
+
+<p>
+  To apply transforms, we simply used the translation, rotation and scale matrices. These were applied to the cubeman to make he appear confused, 
+  scratching his head with his hand on his hip, as shown below.
+</p>
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="img/confused-cubeman.png" align="middle" width="500px"/>
+        <figcaption align="middle"> Hmm, why is this throwing an exception?</figcaption>
+      </td>
+    </tr>
+    <br>
+  </table>
+</div>
+
+<p align="middle">
+  ============================================================================================
+</p>
+
+<h2 align="middle">Task 4: Barycentric coordinates</h2>
+
+<p>
+	The barycentric coordinate system is, as the name states, a coordinate system commonly used for triangles where the coordinates for a given 
+	point inside a triangle are relative to the vertices. Each coordinate (\(\alpha, \beta, \gamma\)) represents the point's relative placement 
+	to each vertice. The equation that describes this relationship is \(P = \alpha\cdot P_0 + \beta\cdot P_1 + \gamma\cdot P_2\). In this task, 
+	we utilized barycentric coordinates in order to apply gradients to pixels inside a triangle through linear interpolation. Each vertice was 
+	assigned its own color, and the pixels inside should have their color assigned by calculating their relative positioning to each vertice and 
+	obtaining the sum of the weighted colors. This provides each pixel a color value that is a blend of the three colors. The images below show
+	a simple example of linear interpolation in a triangle, and the result obtained with <code>svg/basic/test7.svg</code>.
+</p>
+<div align="middle">
+	<table style="width=100%">
+	  <tr>
+		<td>
+		  <img src="img/task4-example.png" align="middle" width="500px"/>
+		  <figcaption align="middle">Example of linear interpolation in triangle with barycentric coordinates</figcaption>
+		</td>
+		<td>
+			<img src="img/task4.png" align="middle" width="500px"/>
+			<figcaption align="middle">Linear interpolation applied in the test file</figcaption>
+		  </td>
+	  </tr>
+	  <br>
+	</table>
+  </div>
+
+  <p align="middle">
+    ============================================================================================
+  </p>
+
+<h2 align="middle">Task 5: "Pixel sampling" for texture mapping</h2>
+<p>
+	In the most simple way to describe, pixel sampling is mapping a texture to a pixel on the screen. Since the texture and the pixels
+	are on different coordinate systems, we have to utilize a method to map a color from a texture to the pixel. In this part of the assignment,
+	we will be applying two methods: nearest-pixel sampling and bilinear interpolation.
+</p>
+<p>
+	Nearest-pixel sampling is the simpler method. Like the name suggests, it consists of mapping the color from the nearest texel to the pixel.
+  First we must obtain the \((u,v)\) coordinates that refer to the \((x,y)\) coordinates of the pixel. We do this by obtaining the barycentric coordinates 
+  of the pixel, since it is relative to the triangle. Then, we simply round the \((u,v)\) coordinates in order to find the value of the nearest texel, and
+  map that to the pixel.
+</p>
+<p>
+  Bilinear interpolation is similar to nearest-pixel, but instead of mapping only the nearest texel color, we get the values of the four nearest texels,
+  and use interpolation to determine the value to be mapped. To get the four nearest texels, we must apply <code>floor()</code> and <code>ceil()</code>
+  to the \((u,v)\) coordinates. We then interpolate the values to obtain the weighted average color, which is mapped to the pixel.
+</p>
+<p>
+  In order to compare the two methods, the images below were mapped with both methods at sample rates of 1 and 16 samples per pixel:
+</p>
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="img/task5-linear1.png" align="middle" width="500px"/>
+        <figcaption align="middle">Nearest-pixel sampling with 1 sample per pixel</figcaption>
+      </td>
+      <td>
+        <img src="img/task5-linear16.png" align="middle" width="500px"/>
+        <figcaption align="middle">Nearest-pixel sampling with 16 sample per pixel</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr>
+      <td>
+        <img src="img/task5-bilinear1.png" align="middle" width="500px"/>
+        <figcaption align="middle">Bilinear sampling with 1 sample per pixel</figcaption>
+      </td>
+      <td>
+        <img src="img/task5-bilinear16.png" align="middle" width="500px"/>
+        <figcaption align="middle">Bilinear sampling with 16 sample per pixel</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<p>
+  As we can see in the images above, the bilinear approach did much better than the nearest-pixel when the sample rate was 1, with better defined and 
+  smoother letters. This is still true when the sample rate was increased to 16, but much more subtle since on larger resolutions, the increased amount of
+  samples around a pixel make averaging the color value less impactful. However, it is possble to notice that the bilinear has better defined letters, with 
+  less jaggies. This comparison shows that in lower resolution images, the differences in bilinear and nearest-pixel sampling are more visible, this difference
+  being quite subtle on larger samples. Since bilinear is a much more resource-heavy approach, not only sampling four times the amount of the nearest-pixel 
+  but also applying interpolations, perhaps opting for the simpler nearest-pixel on larger images can be more resource-effective.
+</p>
+
+<p align="middle">
+  ============================================================================================
+</p>
+
+<p>
+  Link to Github Pages: https://cal-cs184-student.github.io/project-webpages-sp23-Bilbia/proj1/index.html
+</p>
+
+</body>
 </html>
