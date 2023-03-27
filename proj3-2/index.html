@@ -1,7 +1,195 @@
-<html>
-	<head>
-	</head>
-	<body>
-		Project 3-2 here
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>Project 3-2: Pathtracer</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+
+	<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2023</h1>
+	<h1 align="middle">Project 3-2: Pathtracer</h1>	
+	<h2 align="middle">Beatriz Muniz de Castro e Silva (biamcs@berkeley.edu)</h2>
+	<h2 align="middle">Jie Chen (beckychen0921@berkeley.edu)</h2>
+	<h2 align="middle">GitHub Pages: https://cal-cs184-student.github.io/project-webpages-sp23-Bilbia/proj3-2/index.html</h2>
+
+	
+	<br><br>
+	
+	<a href="../"><p align="middle">Back to Homepage</p></a>
+	
+	<p align="middle">
+	  ============================================================================================
+	</p>
+	
+	<h2 align="middle">Part 1: Mirror and Glass Materials</h2>
+
+	<h3>Show a sequence of six images of scene CBspheres.dae rendered with max_ray_depth set to 0, 1, 2, 3, 4, 5, and 100. The other settings should be at 
+		least 64 samples per pixel and 4 samples per light. Make sure to include all screenshots.
+	</h3>
+
+	<div align="middle">
+		<table style="width=100%">
+		  <tr>
+			<td>
+			  <img src="img/part1/spheres_m0.png" align="middle" width="500px"/>
+			  <figcaption align="middle">0 max_ray_depth</figcaption>
+			</td>
+			<td>
+			  <img src="img/part1/spheres_m1.png" align="middle" width="500px"/>
+			  <figcaption align="middle">1 max_ray_depth</figcaption>
+			</td>
+		  </tr>
+		  <br>
+		  <tr>
+		  <td>
+			<img src="img/part1/spheres_m2.png" align="middle" width="500px"/>
+			<figcaption align="middle">2 max_ray_depth</figcaption>
+		  </td>
+		  <td>
+			<img src="img/part1/spheres_m3.png" align="middle" width="500px"/>
+			<figcaption align="middle">3 max_ray_depth</figcaption>
+		  </td>
+		  </tr>
+		  <br>
+		  <tr>
+		  <td>
+			<img src="img/part1/spheres_m4.png" align="middle" width="500px"/>
+			<figcaption align="middle">4 max_ray_depth</figcaption>
+		  </td>
+		  <td>
+			<img src="img/part1/spheres_m5.png" align="middle" width="500px"/>
+			<figcaption align="middle">5 max_ray_depth</figcaption>
+		  </td>
+		  </tr>
+		  <br>
+		  <tr>
+		  <td>
+			<img src="img/part1/spheres_m100.png" align="middle" width="500px"/>
+			<figcaption align="middle">100 max_ray_depth</figcaption>
+		  </td>
+		  </tr>
+		</table>
+	</div>
+	
+	<h3>Point out the new multibounce effects that appear in each image. Explain how these bounce numbers relate to the particular effects that appear. Make sure to include all screenshots.</h3>
+
+	<p>In this part of the assignment, we implemented reflection and refraction in order to render mirror and glass materials. With a max_ray_depth of 0, no bounces
+		occur, which means that the only type of light that is rendered is <code>zero_bounce_radiance</code>. Therefore, the only thing visible is the light source
+		on the top of the scene. With a max_ray_depth of 1, we have one bounce, and we can see how the light reflects on the scene directly, with no indirect
+		lighting. If we look at the spheres closely, you can see how the left mirror sphere reflects the light source completly, while the right glass sphere 
+		refracts the light, so only a random amount of the light source samples are reflected. With a max_ray_depth of 2, indirect lighting starts to take effect.
+		Now, the mirror sphere starts getting rays that hit off other parts of the room first, starting to actually act like a mirror. However, the mirrored
+		image that appears on the surface of the sphere appears as a max_ray_depth - 1, as is evidenced by the black roof of the room, so there is no indirect
+		lighting being mirrored. The glass sphere shows some reflection as well, but there are still not enough bounces to properly refract, since the ray enters
+		the sphere, but does not come out. At may_ray_depth of 3, refraction finally begins appearing, as now the exiting ray is computed. However, since the mirror
+		renders an image with max_ray_depth - 1 bounces, the mirrored image of the glass sphere still appears black. The refraction also creates a spotlight from the 
+		direct lighting rays, as is seen underneath the sphere. With a may_ray_depth of 4, we can see how the mirrored image of the glass ball appears correctly, 
+		but still a little dark. Now that the refracted light rays can bounce more and interact with the rest of the scene, we notice another small spotlight on the
+		right wall, and the image in general appears a little lighter. With max_ray_depth 5, the mirrored glass sphere looks a little lighter, but it is a subtle
+		detail. From them on, increasing the max_ray_depth does not change the image much, the image looking extremely similar even with 100 bounces. 
+	</p>
+	
+	<p align="middle">
+	  ============================================================================================
+	</p>
+	
+	<h2 align="middle">Part 4: Depth of Field</h2>
+
+	<h3>In a few sentences, explain the differences between a pinhole camera model and a thin-lens camera model.</h3>
+
+	<p>The pinhole camera model is a basic model of a camera that uses a small aperture (pinhole) to create an image on a flat surface (image plane). The size 
+		of the aperture plays a significant role in determining the field of view and depth of field of the image. In this model, the image created is always 
+		inverted and mirrored from left to right.
+	</p>
+
+	<p>In contrast, the thin-lens camera model is a more advanced model that considers the effects of refraction through a lens. The thin, curved lens of the 
+		camera focuses the light onto the image plane, and the position and shape of the lens determine the field of view and depth of field of the image. The 
+		image produced by a thin-lens camera can be inverted or upright, depending on the orientation of the lens and the image plane. The primary advantage 
+		of thin-lens cameras is their ability to produce sharp images with a shallow depth of field, while the primary benefit of pinhole cameras is their 
+		simplicity and user-friendliness.
+	</p>
+
+	<h3>Show a "focus stack" where you focus at 4 visibly different depths through a scene. Make sure to include all screenshots.</h3>
+
+	<p><code>CBdragon.dae</code> aperture: 0.23</p>
+
+	<div align="middle">
+		<table style="width=100%">
+		  <tr>
+			<td>
+			  <img src="img/part4/image4.png" align="middle" width="500px"/>
+			  <figcaption align="middle">-d 2</figcaption>
+			</td>
+			<td>
+			  <img src="img/part4/image8.png" align="middle" width="500px"/>
+			  <figcaption align="middle">-d 3</figcaption>
+			</td>
+		  </tr>
+		  <br>
+		  <tr>
+		  <td>
+			<img src="img/part4/image6.png" align="middle" width="500px"/>
+			<figcaption align="middle">-d 4</figcaption>
+		  </td>
+		  <td>
+			<img src="img/part4/image7.png" align="middle" width="500px"/>
+			<figcaption align="middle">-d 5</figcaption>
+		  </td>
+		  </tr>
+		</table>
+	</div>
+
+	<h3>Show a sequence of 4 pictures with visibly different aperture sizes, all focused at the same point in a scene. Make sure to include all screenshots.</h3>
+
+	<p><code>CBdragon.dae</code> focus length: 4.5</p>
+
+	<div align="middle">
+		<table style="width=100%">
+		  <tr>
+			<td>
+			  <img src="img/part4/image2.png" align="middle" width="500px"/>
+			  <figcaption align="middle">-b 0.04</figcaption>
+			</td>
+			<td>
+			  <img src="img/part4/image1.png" align="middle" width="500px"/>
+			  <figcaption align="middle">-b 0.14</figcaption>
+			</td>
+		  </tr>
+		  <br>
+		  <tr>
+		  <td>
+			<img src="img/part4/image5.png" align="middle" width="500px"/>
+			<figcaption align="middle">-b 0.24</figcaption>
+		  </td>
+		  <td>
+			<img src="img/part4/image3.png" align="middle" width="500px"/>
+			<figcaption align="middle">-b 0.34</figcaption>
+		  </td>
+		  </tr>
+		</table>
+	</div>
+	
+	<p align="middle">
+	  ============================================================================================
+	</p>
+	
 	</body>
-</html>
+	</html>
